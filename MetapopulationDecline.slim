@@ -1,0 +1,386 @@
+/* set up a nonWF simulation
+Assume two chances for reproduction per year, with only a subset of individuals 
+reproducing in the second cycle. 
+That means each tick is half a year, and ages/times divided by two.
+
+Start by reading in a rescaled metapopulation run. K should reflect the modern estimated pop size.
+and N would now be dictated by fitness (or carrying capacity, but no scaling greater than 1).
+Q should probably be 1 at this point since populations sizes are likely small.
+
+*/
+initialize() {
+	initializeSLiMModelType("nonWF");
+	defineConstant("simID", getSeed());
+	
+	//Set defaults
+	if(!exists("jsonParams")) defineConstant("jsonParams","/home/erik/PPM/ppm_simulation_project/good_scripts/finals/MetapopulationDeclineParameters.json"); // Read parameters from a json file
+	if(!isNULL(jsonParams)){
+		catn("Reading parameters from JSON.");
+		// Read JSON file into a dictionary
+		json_path = readFile(jsonParams);
+		params = Dictionary(json_path);
+		keys = params.allKeys;
+		// Iterate and define constants
+		for (key in keys) {
+			value = params.getValue(key);
+			defineConstant(key, value);
+			catn("Defined constant: " + key + " = " + value);
+		}
+	} else {
+		
+		if(!exists("K1")) defineConstant("K1", 100);	// Dana Point historical carrying capacity 
+		if(!exists("K2")) defineConstant("K2", 300);	// Santa Margarita historical carrying capacity
+		if(!exists("K3")) defineConstant("K3", 100);	// S. San Mateo historical carrying capacity
+		if(!exists("Kcb")) defineConstant("Kcb", 250);	// Carrying capacity of the captive pop
+		if(!exists("botgens")) defineConstant("botgens", 2); // Length of population declines (2 ticks per calendar year)
+		if(!exists("postbot")) defineConstant("postbot", 100); // Number of ticks to track after population declines (2 ticks per calendar year)
+		if(!exists("source")) defineConstant("source",4); // Source for translocation, see list of K for pop names - 1-based index!! (e.g. 1,2,3)
+		if(!exists("sink")) defineConstant("sink",c(1,3)); // target for translocation, see list of K for pop names
+		if(!exists("trans_size")) defineConstant("trans_size",5); // Number of individuals each translocation event
+		if(!exists("trans_freq")) defineConstant("trans_freq",2); // Frequency (in ticks) of each translocation event (2 = 1 per year)
+		if(!exists("continuousSupplement")) defineConstant("continuousSupplement",T); // supplement the ex situ every year? False is just the original founders
+		if(!exists("suppSize")) defineConstant("suppSize",4);
+		if(!exists("samp_size")) defineConstant("samp_size",30); // Define sample size for stats calculation
+		if(!exists("Q")) defineConstant("Q",1); //Carry over from burnin, probably should always stay at 1 here
+		if(!exists("winterMortality")) defineConstant("winterMortality",0.33); // stochastic mortality during winter
+		if(!exists("outfreq")) defineConstant("outfreq",1); // Set output frequency for stats
+		if(!exists("fin")) defineConstant("fin","~/TestBurnin_N55kGens50kQ10_metapopulation_simulationState.txt_simulationState_rescaledCoeffs.txt"); // A burned in ancestral population with formed metapopulation
+		if(!exists("rescale_out")) defineConstant("rescale_out",T); // Rescale the selection coeffs before saving sim state
+	}
+	// Define a global dictionary that will help with setting karyotypes from tags 
+	// This will work almost like a subset sum distinct sequence. Parent karyotypes will be added, 
+	// and the values for that key represtnt the possible offspring karyotypes and probabilities. 0 = 2n56, 1 = 2n57, 3 = 2n58.
+	defineGlobal("karyo_dict",Dictionary(0,c(0),1,c(0,0,0,1),2,c(0,1,1,3),3,c(1,1,1,1),4,c(1,1,3,3),6,c(3)));
+	
+	defineConstant("g",25200); // # of genes
+	defineConstant("geneLength", 2600);
+	defineConstant("seqLength",g*geneLength);
+	defineConstant("L", c( 0.3, 0.3, 0.14, 0.14, 0.14, 0.14, 0.3, 0.3, 0.8, 1.0));
+	defineConstant("rohCutoff",0.015);
+	
+	initializeMutationRate(2.066e-9*Q); //adjusted to be non-synonymous
+	
+	// set dominance coefficients for different deleterious mutation types and allow DFE bins to be scaled
+	defineConstant("h_wkDel", 0.45);
+	defineConstant("h_modDel", 0.2);
+	defineConstant("h_strDel", 0.05);
+	defineConstant("h_semiLet", 0.0);
+	defineConstant("h_let",0.0);
+	defineConstant("t1", -0.001);
+	defineConstant("t2", -0.01);
+	defineConstant("t3", -0.1);
+	
+	// set up discrete DFE with four mutation types coming from gamma DFE
+	// augmented with recessive lethals
+	// this approach for implementing an h-s relationship is much faster than using fitness callbacks in SLiM (see manual)
+	initializeMutationType("m1", h_wkDel, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < t1); return x*Q;");
+	initializeMutationType("m2", h_modDel, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < t2 | x >= t1); return x*Q;");
+	initializeMutationType("m3", h_strDel, "s", "do x=rgamma(1,-0.01314833,0.186); while (x < t3 | x >= t2); return x*Q;");
+	initializeMutationType("m4", h_semiLet, "s", "do x=rgamma(1,-0.01314833,0.186); while (x >= t3); return x*Q;");
+	initializeMutationType("m5", h_let,"f", -1.0);
+	defineConstant("let_frac", 0.005);
+	// set proportion of each mutation type as determined by Kim 2017 DFE augmented with lethals
+	initializeGenomicElementType("g1", c(m1,m2,m3,m4,m5), c(0.491*(1-let_frac), 0.247*(1-let_frac), 0.236*(1-let_frac), 0.026*(1-let_frac), let_frac));
+	c(m1,m2,m3,m4,m5).convertToSubstitution=F;
+	
+	// Set up genes on 28 chromosome
+	gene_nums = c(2435,1897,1965,929,936,1596,1349,905,702,931,1166,616,1493,747,493,623,1341,600,431,1169,469,416,857,345,424,365); //Random numbers of genes that are close to what ppm chromosomes have
+	
+	for (i in 1:g){
+		initializeGenomicElement(g1, ((i-1)*geneLength)+(i-1), (i*geneLength)+(i-2) );
+	}
+	
+	rates=NULL;
+	recomb_rate=1e-6*Q;
+	
+	// Multiple chromosomes:
+	for (i in 1:(size(gene_nums)-1)){
+		rates=c(rates, 0, rep(c(recomb_rate, 0), asInteger(gene_nums[i-1]-1)), 0.5);
+	}
+	rates=c(rates, 0, rep(c(recomb_rate, 0), asInteger(gene_nums[size(gene_nums)-1]-1)));
+	
+	ends=NULL;
+	for (i in 1:g){
+		ends=c(ends, (i*geneLength)+(i-2), (i*geneLength)+(i-1));
+	}
+	ends=ends[0:(size(ends)-2)];
+	
+	initializeRecombinationRate(rates, ends);
+}
+
+reproduction() {
+	for(pop in sim.subpopulations){
+		if(pop.name=="p4"){ // Repro block specific to the ex situ pop
+			// draw monogamous pairs and generate litters but scale litter size by fitness instead of breeding prob
+			raw_space = p4.getValue("K") - p4.individualCount;
+			// Adjust for likely deaths and translocations
+			pop_fit = mean(pop.cachedFitness(NULL));
+			available_space = (raw_space/pop_fit) + (sum(trans_size)/trans_freq);
+			if (available_space > 3) {
+				parents = sample(p4.individuals,min(p4.individualCount,asInteger(round(available_space/2)))); // Divide by two so that two parents produce 4 offspring
+				for (i in seq(0, size(parents) - 2, by=2)) {
+					parent1 = parents[i];
+					parent2 = parents[i + 1];
+					parent1_base_fit = pop.cachedFitness(parent1.index)/parent1.tagF; // Adjust litter size by mean fitness of parents
+					parent2_base_fit = pop.cachedFitness(parent2.index)/parent2.tagF;
+					mean_scaled_parent_fitness = mean(c(parent1_base_fit,parent2_base_fit));
+					parent_karyotype = sum(c(parent1.tag,parent2.tag));
+					// If parents have different karyotypes, reduce litter mean by 0.67, using the models estimates from Wilder et al. 2025
+					if( any(parent_karyotype == c(1,2,3)) ){
+						offs_count = min(rpois(1,4.25*mean_scaled_parent_fitness*0.67),7);
+					} else {
+						offs_count = min(rpois(1,4.25*mean_scaled_parent_fitness),7); // Numbers from talking with Debra about mean litter size in wild vs captive - c.f. 2.75 used below.
+					}
+					new_offs = pop.addCrossed(parent1, parent2, count=offs_count);
+					for(ind in new_offs){
+						ind.tagL0 = F;
+						ind.tag = sample(karyo_dict.getValue(parent_karyotype),1);
+					}
+				}
+			}
+		} else { // Repro block for all the wild populations
+			if(pop.individualCount<2) next;
+			base_fit = pop.cachedFitness(NULL)/pop.individuals.tagF;
+			breeding_binom = asLogical(rbinom(pop.individualCount,1,base_fit));
+			breeders = pop.individuals[breeding_binom];
+			// Even ticks will represent second litters, which not all mice will do. 
+			// We will sample a fraction on those ticks
+			// randomize the order of p1.individuals and/or subset
+			if (sim.cycle % 2 == 0) {
+				parents = sample(breeders, asInteger(size(breeders)*0.5));
+			} else {
+				parents = sample(breeders, size(breeders));
+			}
+			if(size(parents) < 2) next;
+			
+			// draw monogamous pairs and generate litters
+			for (i in seq(0, size(parents) - 2, by=2)) {
+				parent1 = parents[i];
+				parent2 = parents[i + 1];
+				parent1_base_fit = pop.cachedFitness(parent1.index)/parent1.tagF; // Adjust litter size by mean fitness of parents
+				parent2_base_fit = pop.cachedFitness(parent2.index)/parent2.tagF;
+				mean_scaled_parent_fitness = mean(c(parent1_base_fit,parent2_base_fit));
+				parent_karyotype = sum(c(parent1.tag,parent2.tag));
+				if(any(parent_karyotype == c(1,2,3))){
+					offs_count = min(rpois(1,((mean_scaled_parent_fitness*4)-0.5)*0.67),7);
+				} else {
+					offs_count = min(rpois(1,(mean_scaled_parent_fitness*4)-0.5),7); // Numbers from talking with Debra about mean litter size in wild
+				}
+				new_offs = pop.addCrossed(parent1, parent2, count=offs_count);
+				for(ind in new_offs){
+					ind.tagL0 = F;
+					ind.tag = sample(karyo_dict.getValue(parent_karyotype),1);
+				}
+			}
+		}
+	}
+	// disable this callback for this cycle
+	self.active = 0;
+
+}
+
+// Read in ancestral pop
+1 early () {
+	catn("#Reading in population state from file");
+	catn("Generation,Population,PopSize,MeanFitness,Het,InbLoad,Froh,Fixedweak,Fixedmod,Fixedstr,Fixedsemilet,K");
+	sim.readFromPopulationFile(fin);
+	p1.setValue("Kcurrent",p1.individualCount);
+	p2.setValue("Kcurrent",p2.individualCount);
+	p3.setValue("Kcurrent",p3.individualCount);
+	p1.setValue("K",K1);
+	p2.setValue("K",K2);
+	p3.setValue("K",K3);
+	p1.setValue("Increment",(p1.individualCount-K1)/botgens);	// Decrease population size incrementally for "botgens" number of generations
+	p2.setValue("Increment",(p2.individualCount-K2)/botgens);
+	p3.setValue("Increment",(p3.individualCount-K3)/botgens);
+	p1.individuals.tag = 3; // Set up an int tag to represent karyotype. Code DP as 3 and hets as 1 to use like a bit score.
+	p2.individuals.tag = 0;
+	p3.individuals.tag = 0;
+	
+	// start a newly seeded run and reschedule all blocks
+	setSeed(rdunif(1, 0, asInteger(2^20) - 1));
+	defineConstant("current_tick", community.tick);
+	community.rescheduleScriptBlock(s1,start=current_tick+1,end=current_tick+botgens); // bottlenecking early block
+	community.rescheduleScriptBlock(s2,start=current_tick+botgens+1,end=current_tick+botgens+1); // Form the captive pop
+	community.rescheduleScriptBlock(s3,start=current_tick+botgens+1,end=current_tick+botgens+postbot-1); // post-bottleneck early block	
+	community.rescheduleScriptBlock(s4,start=current_tick+1,end=current_tick+botgens+postbot-1); // Universal late block
+	community.rescheduleScriptBlock(s5,start=current_tick+botgens+postbot,end=current_tick+botgens+postbot); // Final output
+	
+	for (pop in sim.subpopulations){
+		pop.individuals.tagF = pop.individuals.fitnessScaling*pop.fitnessScaling;
+		pop.individuals.tagL0 = F;
+	}
+}
+
+s1 2:100 early() {
+	for(pop in sim.subpopulations){
+		if(pop.individualCount < 1) next;
+		popK = pop.getValue("Kcurrent")-pop.getValue("Increment");
+		pop.setValue("Kcurrent",popK);
+		ages = pop.individuals.age;
+		mortality = L[ages];
+		survival = 1 - mortality;
+		pop.individuals.fitnessScaling = survival;
+		
+		// Stochastic winter mortality following even tick repro (summer breeding)
+		if(sim.cycle % 2 == 0){
+			deaths = asLogical(runif(pop.individualCount,0,1) < (winterMortality));
+			pop.individuals[deaths].fitnessScaling = 0.0;
+		}
+		pop.fitnessScaling = min(popK / (pop.individualCount*mean(survival)),1.0);
+		pop.individuals.tagF = pop.individuals.fitnessScaling*pop.fitnessScaling; // Mortality and density related fitness scalings
+	}
+}
+
+s2 100 first(){
+	sim.addSubpop("p4",0);
+	p4.setValue("K",Kcb);
+	p4.takeMigrants(sample(p1.individuals, 11));
+	p4.takeMigrants(sample(p2.individuals, 14));
+	p4.takeMigrants(sample(p3.individuals, 17));
+	p4.individuals.tagL0 = T;
+}
+
+s3 100:200 early() {
+	// Set translocation populations
+	for(idx in seq(1,size(sink))){
+		trans_source = sim.subpopulations[source-1]; // Convert it to 0-based index 	
+		trans_sink = sim.subpopulations[sink[idx-1]-1]; // First subset from the sink vector, then subset from the subpop vector
+		pop_specific_trans_size = trans_size[idx-1];
+		if(trans_sink.individualCount > 0 & sim.cycle % trans_freq == 1){ // Only allow translocations during the spring 
+			catn("# Moving " + pop_specific_trans_size + " individuals from " + trans_source.name + " to " + trans_sink.name);
+			chosen_ones = trans_source.sampleIndividuals(size=pop_specific_trans_size,maxAge=4,tagL0=F); // Make sure they are 2 or younger and not a founder themselves if using the ex situ as source
+			trans_sink.takeMigrants(chosen_ones);
+		}
+	}
+	for(pop in sim.subpopulations){
+		if(pop.name=="p4"){
+			if(continuousSupplement == T & sim.cycle % suppFreq == 1){
+				suppSourceIndex = asInteger(sim.cycle % 3);
+				suppSource = sim.subpopulations[suppSourceIndex];
+				if(suppSource.individualCount>10) p4.takeMigrants(sample(suppSource.individuals,suppSize));
+			}
+			ages = pop.individuals.age;
+			mortality = L[ages];
+			survival = 1 - mortality;
+			pop.individuals.fitnessScaling = survival;
+			pop.individuals.tagF = pop.individuals.fitnessScaling*pop.fitnessScaling;
+		
+		} else {
+			if(pop.individualCount < 1) next;
+			popK = pop.getValue("K");
+			ages = pop.individuals.age;
+			mortality = L[ages];
+			survival = 1 - mortality;
+			pop.individuals.fitnessScaling = survival;
+			
+			// Stochastic winter mortality following even tick repro (summer breeding)
+			if(sim.cycle % 2 == 0){
+				deaths = asLogical(runif(pop.individualCount,0,1) < (winterMortality));
+				pop.individuals[deaths].fitnessScaling = 0.0;
+			}
+			
+			pop.fitnessScaling = min(popK / (pop.individualCount*mean(survival)),1.0);
+			pop.individuals.tagF = pop.individuals.fitnessScaling*pop.fitnessScaling; // Mortality and density related fitness scalings
+		}
+	}
+}
+
+s4 2:199 late() {
+	// Set translocation populations
+	
+	if(sim.cycle > current_tick+botgens){
+		for(subpop in sim.subpopulations) {
+			base_fit = subpop.cachedFitness(NULL)/subpop.individuals.tagF;
+			subpop.setValue("baseFit",mean(base_fit));
+			if(sim.cycle % outfreq == 0){
+				pop_stats = calc_stats(subpop,samp_size);
+				catn(sim.cycle + "," + subpop.name + "," + size(subpop.individuals) +"," + paste(pop_stats,sep=",") + "," + subpop.getValue("Kcurrent"));
+			}
+		}
+		/*
+		if(sim.cycle % 10 == 0){
+			catn("#Pairwise Fst:");
+			if(length(p1.genomes) > 0 & length(p2.genomes) > 0) {
+				catn("#Fst P1P2: " + calcFST(p1.genomes,p2.genomes));
+			}
+			if(length(p1.genomes) > 0 & length(p3.genomes) > 0) {
+				catn("#Fst P1P3: " + calcFST(p1.genomes,p3.genomes));
+			}
+			if(length(p3.genomes) > 0 & length(p2.genomes) > 0) {
+				catn("#Fst P2P3: " + calcFST(p2.genomes,p3.genomes));
+			}
+		} */
+	} else {
+		for(subpop in sim.subpopulations) {
+			translocation = 0;
+			base_fit = subpop.cachedFitness(NULL)/subpop.individuals.tagF;
+			subpop.setValue("baseFit",mean(base_fit));
+			if(sim.cycle % outfreq == 0){
+				pop_stats = calc_stats(subpop,samp_size);
+				catn(sim.cycle + "," + subpop.name + "," + size(subpop.individuals) +"," + paste(pop_stats,sep=",") + "," + subpop.getValue("Kcurrent"));
+			}
+		}
+	}
+}
+
+s5 200 late(){
+	/*
+	for(subpop in sim.subpopulations){
+		pop_stats = calc_stats(subpop,samp_size);
+		catn(sim.cycle + "," + subpop.name + "," + size(subpop.individuals) +"," + paste(pop_stats,sep=","));
+	}
+	*/
+	catn("#Pairwise Fst:");
+	catn("#Fst P1P2: " + calcFST(p1.genomes,p2.genomes));
+	catn("#Fst P1P3: " + calcFST(p1.genomes,p3.genomes));
+	catn("#Fst P2P3: " + calcFST(p2.genomes,p3.genomes));
+	
+	
+	sim.simulationFinished();
+}
+
+// Calculate all the pop gen stats
+function (f) calc_stats(o subpop, i n_size){
+	if (subpop.individualCount<2) {
+		base_fit=0;
+		scaled_het=0;
+		inbLoad=0;
+		froh=1;
+	} else {
+		sample_inds = sample(subpop.individuals, min(n_size,subpop.individualCount));
+		
+		//Mutation-only fitness
+		base_fit = subpop.cachedFitness(sample_inds.index)/sample_inds.tagF;
+		
+		//Heterozygosity adjusted by the scale fraction
+		scaled_het = calcHeterozygosity(sample_inds.genomes);
+		
+		//Calculate genetic load
+		inbLoad = calcInbreedingLoad(sample_inds.genomes)*2; //*2 to make it diploid, see page 766 of slim manual
+		
+		// Froh calculation (after scaled burnin though?)
+		froh=NULL;
+		froh_sum=0;
+		roh_length_cutoff = seqLength*rohCutoff/Q;
+		for (ind in sample_inds){
+			ind_mut_pos1 = ind.genome1.mutations.position;
+			ind_mut_pos2 = ind.genome2.mutations.position;
+			hets = sort(c(setDifference(ind_mut_pos1,ind_mut_pos2),setDifference(ind_mut_pos2,ind_mut_pos1)));
+			starts = c(0,hets);
+			ends = c(hets,seqLength);
+			rohs = ends - starts;
+			froh_sum = sum(rohs[rohs>roh_length_cutoff]);
+			froh = c(froh,froh_sum/seqLength);
+		}
+	}
+	// Mutation data
+	m1s=sum(sim.mutationFrequencies(NULL,sim.mutationsOfType(m1))==1);
+	m2s=sum(sim.mutationFrequencies(NULL,sim.mutationsOfType(m2))==1);
+	m3s=sum(sim.mutationFrequencies(NULL,sim.mutationsOfType(m3))==1);
+	m4s=sum(sim.mutationFrequencies(NULL,sim.mutationsOfType(m4))==1);
+	
+	return c(mean(base_fit),scaled_het,mean(inbLoad),mean(froh),m1s,m2s,m3s,m4s);
+}
+
+

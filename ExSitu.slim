@@ -1,0 +1,314 @@
+// Simulate the Ex Situ PPM population using empirical data from the founder vcf
+initialize() {
+	initializeSLiMModelType("nonWF");
+	
+	// neutral mutations, which are allowed to fix
+	initializeMutationType("m1", 0.5, "f", 0.0); // Neutral mutations read in from vcf
+	initializeMutationType("m2", 0.5, "f", 0.0); // karyotype
+	initializeMutationType("m3", 0.5, "f", 0.0); // DP ancestry
+	initializeMutationType("m4", 0.5, "f", 0.0); // SM ancestry
+	initializeMutationType("m5", 0.5, "f", 0.0); // SSM ancestry
+	c(m1,m2,m3,m4).convertToSubstitution = F;
+	
+	initializeGenomicElementType("g1", m1, 1.0);
+	initializeGenomicElementType("g2", c(m2,m3,m4), c(1.0,1.0,1.0));
+	initializeGenomicElement(g1, 0, 72679016); // Chr 10 length
+	initializeGenomicElement(g2, 72679017, 73679016);
+	initializeMutationRate(0); // Consider only standing variation
+	initializeRecombinationRate(c(5.5e-9,0.5, 1e-8),c(72679016,72679017,73679016)); // From Norway Rat
+	initializeSex("A");
+	defineConstant("Lcap", c( 0.2, 0.01, 0.010, 0.010, 0.010, 0.20, 0.2, 0.2, 0.25, 0.35, 0.45, 0.55, 0.55, 0.70, 0.85, 1.0)); // age mortality adjusted for cap
+	defineConstant("Lwild", c( 0.3, 0.3, 0.14, 0.14, 0.14, 0.14, 0.3, 0.3, 0.8, 1.0, 1.0));
+	
+	if(!exists("jsonParams")) defineConstant("jsonParams","/home/erik/PPM/ppm_simulation_project/good_scripts/finals/vcf_based_models/ExSituParameters.json"); // Read parameters from a json file
+	if(!isNULL(jsonParams)){
+		catn("Reading parameters from JSON.");
+		// Read JSON file into a dictionary
+		json_path = readFile(jsonParams);
+		params = Dictionary(json_path);
+		keys = params.allKeys;
+		// Iterate and define constants
+		for (key in keys) {
+			value = params.getValue(key);
+			defineConstant(key, value);
+			catn("Defined constant: " + key + " = " + value);
+		}
+		
+		// Read in the sample map and define the indivdual indices for each population, and the DP-like karyo group
+		defineGlobal("map", readCSV(sampleMap,colNames=T,sep=""));
+		
+		// Define each of the population set as a global vector of indices using the pop map
+		suppSets=Dictionary();
+		for(pop in unique(map.subset(NULL,"Population"))){
+			suppSets.setValue(pop,which(map.subset(NULL,"Population")==pop));
+		}
+		defineGlobal("popIndices",suppSets);
+	
+	} else {
+		// If no json is provided, define the minimum set of necessary constants
+		defineConstant("founderVariants","/home/erik/PPM/ppm_simulation_project/good_scripts/finals/vcf_based_models/smallFounders.vcf"); // Path to all founders vcf
+		defineConstant("founderSize",41); // Including all supplementals
+		defineConstant("sampleMap","/home/erik/PPM/ppm_simulation_project/vcf_files/allSamples_samplemap.txt");
+		defineConstant("Kcap", 250);	// carrying capacity
+		defineConstant("Kwild",300);	// carrying capacity
+		defineConstant("gen",200); // length to simulation, assume roughly two gens per calendar year
+		defineConstant("winterMortality",0.33); // For wild pops only
+		defineConstant("release_delay",20); // How many ticks before individuals start getting released
+		defineConstant("track_reintro",F); // Logical determining whether or not the reintroduced population should be tracked also
+		defineConstant("trans_size",50);
+		defineConstant("trans_freq",2); // In ticks, where 2 = 1 release per calendar year		
+		defineConstant("Z", 72679016); // genome length
+		defineConstant("I", 1e3); // interval to use for acestry markers? TBD
+		defineConstant("ROHlen",1e6); // 1mb roh cutoff 
+	}
+
+}
+1 reproduction() {
+	for(pop in founderPops){
+		inds = p2.individuals[popIndices.getValue(pop)];
+		for(ind in inds){
+			p1.addCloned(ind);
+		}
+	}
+	self.active=0;
+}
+
+2: reproduction() {
+	// Each tick there is a supplementation, clone new founders from p2
+	if(any(sim.cycle==Supplemental_times)){
+		sourcePop = popIndices.allKeys[NewFounderCount];
+		sourceInds = p2.individuals[popIndices.getValue(sourcePop)];
+		new_founders = sample(sourceInds,min(4,size(sourceInds)));
+		for(ind in sourceInds){
+			offspring = p1.addCloned(ind,1);
+			offspring.setValue("Founder",T);
+		}
+		catn("# Suplementing ex situ using: " + sourcePop);
+		
+		// If the intention is to continue supplementing ex situ beyond the actual number of new founder cohorts
+		// we will just recycle the supplemental cohorts we do have
+		defineGlobal("NewFounderCount", NewFounderCount + 1);
+		if(NewFounderCount >= size(popIndices.allKeys) & recycle_supplements==T) defineGlobal("NewFounderCount",0);
+	}
+	
+	for(pop in sim.subpopulations) {
+		if(pop.name == "p1"){
+			// Calculate the amount of space available in the facility
+			raw_space = Kcap - p1.individualCount;
+			
+			maleBreeders = p1.individuals[p1.individuals.age <= 8 & p1.individuals.sex=="M"]; // Age in ticks, not years
+			femaleBreeders = p1.individuals[p1.individuals.age <= 8 & p1.individuals.sex=="F"]; // Age in ticks, not years
+			max_pairs = min(c(length(maleBreeders),length(femaleBreeders)));
+			// If this is a late season breeding round, reduce breeders by small fraction
+			if(sim.cycle % 2 == 0){
+				femaleBreeders = sample(femaleBreeders,asInteger(round(length(femaleBreeders)*0.8)));
+				max_pairs = min(c(length(maleBreeders),length(femaleBreeders)));
+			}
+			breed_count=0;
+			total_offs=0;
+			if (raw_space > 3) {
+				sperm = sample(maleBreeders,min(max_pairs,asInteger(round(raw_space/4)))); // Divide by mean litter size
+				eggs = sample(femaleBreeders,length(sperm)); // For now, keep this as monogomous pairs
+				for (i in seq(0, size(sperm)-1)) {
+					parent1 = eggs[i];
+					parent2 = sperm[i];
+					
+					// Use the modeled effects of heterozygosity and karyotype to influence reproductive output
+					parent_heterozygosity = calcHeterozygosity(c(parent1.genomes,parent2.genomes),start=0,end=Z);
+					standardized_het = (parent_heterozygosity*1.75 - 0.00237)/0.00037; // standardize and approximate the genome wide est.
+					parent1_karyo = parent1.countOfMutationsOfType(m2);
+					parent2_karyo = parent1.countOfMutationsOfType(m2);
+					karyo = max(parent1_karyo,parent2_karyo);
+					parents = c(parent1,parent2);
+					
+					froh=NULL;
+					for (ind in parents){
+						ind_mut_pos1 = ind.genome1.mutationsOfType(m1).position;
+						ind_mut_pos2 = ind.genome2.mutationsOfType(m1).position;
+						hets = sort(c(setDifference(ind_mut_pos1,ind_mut_pos2),setDifference(ind_mut_pos2,ind_mut_pos1)));
+						starts = c(0,hets);
+						ends = c(hets,Z);
+						rohs = ends - starts;
+						het_count = Z - sum(rohs);
+						froh_sum = sum(rohs[rohs>ROHlen]);
+						froh = c(froh,froh_sum/Z);
+					}
+					scaled_froh = (mean(froh) - 0.089)/0.69;
+					
+					karyo_pois_coeffs=c(0,-0.24,-0.83); // Effect of karyotype from poisson model
+					modeled_offs = exp(standardized_het*0.1059 + scaled_froh*-0.1577 + karyo_pois_coeffs[karyo] + 0.852); //scaled_froh*-0.1577
+					offs_count = rpois(1,modeled_offs);
+					if(offs_count > 0){
+						offs_count = min(rpois(1,modeled_offs*3),7);
+						breed_count = breed_count + 1;
+						total_offs = total_offs + offs_count;
+					}
+					
+					offspring = p1.addCrossed(parent1, parent2, count=offs_count);
+					for(ind in offspring) ind.setValue("Founder",F);
+				}
+				//catn("#" + breed_count + " pairs this generation produced " + total_offs + " offspring.");
+			}
+		}
+		if(pop.name == "p3"){
+			// Reproduction for the wild population
+			if(pop.individualCount >1){
+				maleBreeders = pop.individuals[pop.individuals.age <= 8 & pop.individuals.sex=="M"]; // Age in ticks, not years
+				femaleBreeders = pop.individuals[pop.individuals.age <= 8 & pop.individuals.sex=="F"]; // Age in ticks, not years
+				max_pairs = min(c(length(maleBreeders),length(femaleBreeders)));
+				if(sim.cycle % 2 == 0){
+					femaleBreeders = sample(femaleBreeders,asInteger(round(length(femaleBreeders)*0.5)));
+				}
+				max_pairs = min(c(length(maleBreeders),length(femaleBreeders)));
+				breed_count=0;
+				total_offs=0;
+				sperm = sample(maleBreeders,min(max_pairs,asInteger(round(raw_space/4)))); // Divide by mean litter size
+				eggs = sample(femaleBreeders,length(sperm)); // For now, keep this as monogomous pairs
+				for (i in seq(0, size(sperm)-1)) {
+					parent1 = eggs[i];
+					parent2 = sperm[i];
+					
+					// Use the modeled effects of heterozygosity and karyotype to influence reproductive output
+					parent_heterozygosity = calcHeterozygosity(c(parent1.genomes,parent2.genomes),start=0,end=Z);
+					standardized_het = (parent_heterozygosity - 0.00237)/0.00037;
+					parent1_karyo = parent1.countOfMutationsOfType(m2);
+					parent2_karyo = parent1.countOfMutationsOfType(m2);
+					karyo = max(parent1_karyo,parent2_karyo);
+					parents = c(parent1,parent2);
+					
+					froh=NULL;
+					for (ind in parents){
+						ind_mut_pos1 = ind.genome1.mutations.position;
+						ind_mut_pos2 = ind.genome2.mutations.position;
+						hets = sort(c(setDifference(ind_mut_pos1,ind_mut_pos2),setDifference(ind_mut_pos2,ind_mut_pos1)));
+						starts = c(0,hets);
+						ends = c(hets,Z);
+						rohs = ends - starts;
+						het_count = Z - sum(rohs);
+						froh_sum = sum(rohs[rohs>ROHlen]);
+						froh = c(froh,froh_sum/Z);
+					}
+					scaled_froh = (mean(froh) - 0.089)/0.69;
+					
+					karyo_pois_coeffs=c(0,-0.24,-0.83); // Effect of karyotype from poisson model
+					modeled_offs = exp(standardized_het*0.1059 + scaled_froh*-0.1577 + karyo_pois_coeffs[karyo] + 0.852); //scaled_froh*-0.1577
+					offs_count = rpois(1,modeled_offs);
+					if(offs_count > 1){
+						breed_count = breed_count + 1;
+						total_offs = total_offs + offs_count;
+					}
+					offspring = pop.addCrossed(parent1, parent2, count=offs_count);
+					for(ind in offspring) ind.setValue("Founder",F);
+				}
+			}
+		}
+	}
+	self.active = 0;
+}
+
+
+1 first() {
+	// Read in the founder vcf file and make the ex situ population, and a holding population to transfer clones into
+	sim.addSubpop("p1",0);
+	sim.addSubpop("p2",founderSize); // Start these off in p2 as a permanent holding population with no repro and no mortality
+	sim.addSubpop("p3",0); // place holder if reintroduced is to be tracked
+	p2.genomes.readFromVCF(founderVariants,m1);
+	// Add the karyotype mutation
+	dpindices = which(map.subset(NULL,"Karyotype")==1);
+	dpKaryoInds = p2.individuals[dpindices];
+	dpKaryoInds.genomes.addNewDrawnMutation(m2,0); // Put the karyotype marker mutation at position 0.
+	
+	// Add mutations to g2 at the set interval track ancestry
+	dpAnc = p2.individuals[which(map.subset(NULL,"Source")=="DP")];
+	dpAncPos = asInteger(seq(Z+1,Z+999998,I*3));
+	dpAnc.genomes.addNewDrawnMutation(m3,dpAncPos);
+	smAnc = p2.individuals[which(map.subset(NULL,"Source")=="SM")];
+	smAncPos = asInteger(seq(Z+I,Z+999999,I*3));
+	smAnc.genomes.addNewDrawnMutation(m4,smAncPos);
+	ssmAnc = p2.individuals[which(map.subset(NULL,"Source")=="SSM")];
+	ssmAncPos = asInteger(seq(Z+I*2,Z+1000000,I*3));
+	ssmAnc.genomes.addNewDrawnMutation(m5,ssmAncPos);
+	
+	defineGlobal("NewFounderCount",3); // Track which supplementation set we are on, start with 3 to skip the original founders
+	catn("Generation,Population,PopSize,Heterozygosity,Froh,DPanc,SManc,SSManc");
+}
+
+early() {
+	if(sim.cycle > release_delay & sim.cycle % trans_freq == 1){
+		youngs = p1.individuals[p1.individuals.age <= 5];
+		release_options = youngs[!(youngs.getValue("Founder"))];
+		releases = sample(release_options,trans_size);
+		if(track_reintro == T) {
+			p3.takeMigrants(releases);
+			ages = p3.individuals.age;
+			mortality = Lwild[ages];
+			survival=1-mortality;
+			p3.individuals.fitnessScaling = survival;
+		} else {
+			releases.fitnessScaling = 0.0;
+		}
+	}
+	for(pop in sim.subpopulations){
+		if(pop.name=="p1"){
+			ages = p1.individuals.age;
+			mortality = Lcap[ages];
+			survival = 1 - mortality;
+			p1.individuals.fitnessScaling = survival;
+		}
+		if(pop.name=="p3") {
+			if(pop.individualCount>1){
+				ages = pop.individuals.age;
+				mortality = Lwild[ages];
+				survival = 1 - mortality;
+				pop.individuals.fitnessScaling = survival;
+				if(sim.cycle % 2 == 0){
+					deaths = asLogical(runif(pop.individualCount,0,1) < (winterMortality));
+					pop.individuals[deaths].fitnessScaling = 0.0;
+				}
+				pop.fitnessScaling = min(Kwild / (pop.individualCount*mean(survival)),1.0);
+			}
+		}
+		if(sim.cycle % 2 == 0){
+			if(pop.name=="p2") next;
+			contributors = pop.individuals[pop.individuals.age <= 8];
+			if(size(contributors)<1) next;
+			DPanc = sum(p1.individuals.countOfMutationsOfType(m3));
+			SManc = sum(p1.individuals.countOfMutationsOfType(m4));
+			SSManc = sum(p1.individuals.countOfMutationsOfType(m5));
+			allAnc = sum(c(DPanc,SManc,SSManc));
+			ancProp = c(DPanc,SManc,SSManc)/allAnc;
+			//catn(sim.cycle + "," + pop.name + "," + pop.individualCount + "," + calcHeterozygosity(contributors.genomes,start=0,end=Z)+","+paste(ancProp,sep=","));
+			stats = calc_stats(contributors,30);
+			catn(sim.cycle + "," + pop.name + "," + pop.individualCount + "," + paste(stats,sep=",") + "," + paste(ancProp,sep=","));
+		}
+	
+	}
+
+}
+
+gen late(){
+	sim.simulationFinished();
+}
+
+function (f) calc_stats(o subpop, i n_size){
+	if (n_size <= size(subpop)) {
+		sample_inds = sample(subpop, n_size);
+	} else {
+		sample_inds = subpop;
+	}
+	
+	//Heterozygosity
+	het = calcHeterozygosity(sample_inds.genomes,start=0,end=Z);
+	froh=NULL;
+	for (ind in sample_inds){
+		ind_mut_pos1 = ind.genome1.mutationsOfType(m1).position;
+		ind_mut_pos2 = ind.genome2.mutationsOfType(m1).position;
+		hets = sort(c(setDifference(ind_mut_pos1,ind_mut_pos2),setDifference(ind_mut_pos2,ind_mut_pos1)));
+		starts = c(0,hets);
+		ends = c(hets,Z);
+		rohs = ends - starts;
+		froh_sum = sum(rohs[rohs>ROHlen]);
+		froh = c(froh,froh_sum/Z);
+	}
+	return(c(het,mean(froh)));
+}

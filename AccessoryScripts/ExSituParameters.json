@@ -1,0 +1,26 @@
+  {
+  "Kcap": 200,
+  "Kwild": 300,
+  "gen": 100,
+
+  "winterMortality": 0.33,
+  "release_delay": 9,
+  "track_reintro": "F",
+  "trans_size": 30,
+  "trans_freq": 2,
+  "Z": 72679016,
+  "I": 1e3,
+  "ROHlen":1e6,
+
+  "founderVariants": "/home/centos/USS/erik/PPM/SLiMrescue/vcf_based_simulations/ExSitu/allFounders.vcf",
+  "sampleMap": "/home/centos/USS/erik/PPM/SLiMrescue/vcf_based_simulations/ExSitu/allSamples_samplemap.txt",
+  "founderPops": ["SMoriginalFounders","SSMoriginalFounders","DPoriginalFounder"],
+  "founderSize": 41,
+  "Supplemental_founders": ["SupplementalFounders2014",
+    "SupplementalFounders2016",
+    "SupplementalFounders2019",
+    "SupplementalFounders2020"],
+  "Supplemental_times": [5, 9, 15, 17,21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61, 65, 69, 73, 77, 81, 85, 89, 93, 97],
+  "recycle_supplements": "T"
+  }
+
