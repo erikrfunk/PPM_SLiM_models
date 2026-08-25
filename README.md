@@ -7,12 +7,12 @@ This repository contains scripts for SLiM models used to simulate various parts 
 >>[Full Metapopulation and genetic rescue](#Full-Metapopulation)  
 >>[Ex situ population and supplementation](#Ex-situ-population)  
 >>[Single Population Decline](#Single-Population-Decline)  
+>
 >[Accessory scripts](#Accessory-scripts-used-for-analysis-and-visualization)  
 >>[Shell scripts and configuration files](#Shell-scripts-and-configuration-files)  
 >>[R scripts](#R-scripts)  
 
-
-
+<br>
 
 ## Model descriptions and important user-defined parameters
 All models for PPM treat SLiM's built in tick as a season, rather than a calendar year. We model two seasons per year: a breeding season and a winter season. The key interpretation for all these models is that **2 ticks = 1 calendar year**. 
@@ -84,9 +84,10 @@ This script utilizes sequence data from individuals used to found the ex situ po
 #### Single Population Decline
 This script was primarily used during testing.  It takes a burned-in ancestral simulation state and imposes a user-defined bottleneck on only the single population, instead of first forming a metapopulation. 
 
+<br>
 
 ## Accessory scripts used for analysis and visualization
-***
+
 #### Shell scripts and configuration files
 ##### *Run-FormMetapopulation.sh* 
 A shell script with the most important user defined variables placed at the top. This script will automatically format the shell command and run the slim model to form the metapopulation. See the parameter descriptions listed above for the script [*FormMetapopulation.slim*](#FormMetapopulation.slim). A valid ancestral simulation state must be provided, along with the path to the `FormMetapopulation.slim` script. Once formatted, an example run would be: 
