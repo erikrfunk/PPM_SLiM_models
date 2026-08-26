@@ -4,13 +4,13 @@ This repository contains scripts for SLiM models used to simulate various parts 
 
 **Contents**:  
 >[Model Descriptions](#Model-descriptions-and-important-user-defined-parameters)  
->>[Full Metapopulation and genetic rescue](#Full-Metapopulation)  
->>[Ex situ population and supplementation](#Ex-situ-population)  
->>[Single Population Decline](#Single-Population-Decline)  
+>- [Full Metapopulation and genetic rescue](#Full-Metapopulation)  
+>- [Ex situ population and supplementation](#Ex-situ-population)  
+>- [Single Population Decline](#Single-Population-Decline)  
 >
 >[Accessory scripts](#Accessory-scripts-used-for-analysis-and-visualization)  
->>[Shell scripts and configuration files](#Shell-scripts-and-configuration-files)  
->>[R scripts](#R-scripts)  
+>- [Shell scripts and configuration files](#Shell-scripts-and-configuration-files)  
+>- [R scripts](#R-scripts)  
 
 <br>
 
@@ -82,6 +82,7 @@ This script utilizes sequence data from individuals used to found the ex situ po
 
 
 #### Single Population Decline
+##### SinglePopulationDecline.slim
 This script was primarily used during testing.  It takes a burned-in ancestral simulation state and imposes a user-defined bottleneck on only the single population, instead of first forming a metapopulation. 
 
 <br>
@@ -90,8 +91,8 @@ This script was primarily used during testing.  It takes a burned-in ancestral s
 
 #### Shell scripts and configuration files
 ##### *Run-FormMetapopulation.sh* 
-A shell script with the most important user defined variables placed at the top. This script will automatically format the shell command and run the slim model to form the metapopulation. See the parameter descriptions listed above for the script [*FormMetapopulation.slim*](#FormMetapopulation.slim). A valid ancestral simulation state must be provided, along with the path to the `FormMetapopulation.slim` script. Once formatted, an example run would be: 
-```
+A shell script with the most important user defined variables placed at the top. This script will automatically format the shell command and run the slim model to form the metapopulation. See the parameter descriptions listed above for the script [*FormMetapopulation.slim*](#formmetapopulation.slim). A valid ancestral simulation state must be provided, along with the path to the `FormMetapopulation.slim` script. Once formatted, an example run would be: 
+```bash
 chmod u+x Run-FormMetapopulation.sh
 ./Run-FormMetapopulation.sh > stats.txt  
 ```
@@ -100,8 +101,8 @@ chmod u+x Run-FormMetapopulation.sh
 A shell script to run the bottleneck segment of the model. This script is set up and run similarly to `Run-FormMetapopulation.sh` described above.
 
 ##### *ExSituParameters.json* 
-While the `ExSitu.slim` script does not have an associated shell script to format and run the simulation, the important user-defined variables can be set using this .json file as a template, then provided to the script as a command line parameter. See the parameter descriptions listed above for the script [*ExSitu.slim*](#ExSitu.slim). Once the parameters are set, an example command line would be:
-```
+While the `ExSitu.slim` script does not have an associated shell script to format and run the simulation, the important user-defined variables can be set using this .json file as a template, then provided to the script as a command line parameter. See the parameter descriptions listed above for the script [*ExSitu.slim*](#exsitu.slim). Once the parameters are set, an example command line would be:
+```bash
 slim -d "jsonParams='ExSituParameters.json'" ${path/to/ExSitu.slim} > stats.txt
 ```
 
@@ -109,7 +110,7 @@ slim -d "jsonParams='ExSituParameters.json'" ${path/to/ExSitu.slim} > stats.txt
 Often we wish to run many replicates of the model to capture variability in model results. This shell script will automatically setup a directory with replicate runs. It is important that this script is edited to reflect the desired parameters correct paths, just as would be done when using the stand alone `ExSituParameters.json` file. This is done within the large block of quoted text beginning on line 10.
 
 After configured, It takes just two positional arguments, a starting and stopping iteration number.  An example command to run 100 iterations starting with replicate 1, followed by a loop running all iterations would be:
-```
+```bash
 chmod u+x generate-exsitu-configs.sh
 ./generate-exsitu-configs.sh 1 100
 
