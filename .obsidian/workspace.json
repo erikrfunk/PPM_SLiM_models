@@ -14,7 +14,7 @@
               "type": "markdown",
               "state": {
                 "file": "tutorials/ExtinctionProbability_tutorial.md",
-                "mode": "preview",
+                "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
@@ -199,20 +199,19 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "86649298376692dc",
+  "active": "46cb1640f32baa89",
   "lastOpenFiles": [
+    "README.md",
+    "tutorials/ExtinctionProbability_tutorial.md",
     "misc/DP_rescue_N12Freq4_PopSize.pdf",
     "misc/NoRescue_allPops.pdf",
     "misc",
-    "README.md",
-    "tutorials/ExtinctionProbability_tutorial.md",
     "accessory-scripts/summarize-slim-metapop-bots.R",
     "accessory-scripts/run-metapopulation-decline.sh",
     "accessory-scripts/run-form-metapopulation.sh",
     "accessory-scripts/plot-slim-metapop-bots.R",
     "accessory-scripts/plot-slim-1pop-bots.R",
     "accessory-scripts/plot-ex-situ.R",
-    "accessory-scripts/generate-exsitu-configs.sh",
-    "accessory-scripts/ex-situ-parameters.json"
+    "accessory-scripts/generate-exsitu-configs.sh"
   ]
 }

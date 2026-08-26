@@ -1,6 +1,6 @@
 # Extinction probabilities and genetic rescue in Pacific pocket mouse
 
-This repository contains scripts for SLiM models used to simulate various parts of the PPM system. See below for a more in-depth description of each script and their parameters. Finally, a set of accessory scripts used to run, analyze, and visualize results are included in the `AccessoryScripts` folder and are briefly described below.
+This repository contains scripts for SLiM models used to simulate various parts of the PPM system. See below for a more in-depth description of each script and their parameters. Finally, a set of accessory scripts used to run, analyze, and visualize results are included in the `accessory-scripts` folder and are briefly described below.
 
 **Contents**:  
 1. [Model Descriptions](#Model-descriptions-and-important-user-defined-parameters)  

@@ -59,7 +59,7 @@ ggplot(endstats,aes(x=Generation,y=PopSize,group=Rep,color=Extinct))+
   theme_bw()
 ```
 
-![](../misc/NoRescue_allPops.pdf)
+[](../misc/NoRescue_allPops.pdf)
 
 The plot shows extinct replicates in red, and indicates high extinction probabilities for Dana Point and South San Mateo. Each set of replicates will be slightly different, so your result won't mirror this exactly. It should be close though. We can quantify the extinction probability using the next code block.
 
@@ -128,7 +128,7 @@ ggplot(dp,aes(x=Generation,y=PopSize,group=Rep,color=Extinct))+
 ```
 
 
-![](../misc/DP_rescue_N12Freq4_PopSize.pdf)
+[](../misc/DP_rescue_N12Freq4_PopSize.pdf)
 
 We can see that many more of the replicates are avoiding extinction. Finally, after calculating the probabilities table, we can see that this translocation strategy has reduced the extinction probability from 98% down to just 1%:
 ```r
