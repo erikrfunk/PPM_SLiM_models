@@ -9,7 +9,7 @@
 # General run paramters
 fin="/home/centos/USS/erik/PPM/SLiMrescue/Burnins/N800KGens800KQ10_simulationState.txt"
 out="N800kGens29kQ10_MetapopulationQ4quarterMig"
-metapop_script="/home/centos/USS/erik/PPM/SLiMrescue/scripts/FormMetapopulation.slim"
+metapop_script="/home/centos/USS/erik/PPM/SLiMrescue/scripts/form-metapopulation.slim"
 Q=4
 setNewScale=T
 oldQ=10

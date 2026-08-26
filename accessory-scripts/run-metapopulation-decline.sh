@@ -4,7 +4,7 @@
 ## variable setting:
 
 # General run paramters
-decline_script="/home/centos/USS/erik/PPM/SLiMrescue/scripts/MetapopulationDeclineWithRescueWithCaptive.slim"
+decline_script="/home/centos/USS/erik/PPM/SLiMrescue/scripts/mtapopulation-decline.slim"
 fin="/home/centos/USS/erik/PPM/SLiMrescue/metapopulation_preliminary/N800k1milGensQ10_MetapopulationQ3_adjN_simulationState_rescaledCoeffs.txt"
 Q=1
 winterMortality=0.33
