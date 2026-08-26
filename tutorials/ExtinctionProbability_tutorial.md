@@ -59,7 +59,7 @@ ggplot(endstats,aes(x=Generation,y=PopSize,group=Rep,color=Extinct))+
   theme_bw()
 ```
 
-[](../misc/no-rescue-popsize.png)
+![](../misc/no-rescue-popsize.png)
 
 The plot shows extinct replicates in red, and indicates high extinction probabilities for Dana Point and South San Mateo. Each set of replicates will be slightly different, so your result won't mirror this exactly. It should be close though. We can quantify the extinction probability using the next code block.
 
@@ -114,7 +114,7 @@ The `source=4` indicates that we want to use the ex situ population (population 
 ### 2. Run the simulation
 Just as we did above with the "No Rescue" scenario, we will iterate across 100 replicates and capture the statistics output by each replicate. This can be done using the same loop as above.
 
-## 3. View the results
+### 3. View the results
 We can use the same R script as before to combine and visualize the results from this genetic rescue scenario. We can also subset the file to focus on Dana Point and compare how the extinction probability has changed. First extract Dana Point from the `endstats` dataframe. Then adjust the ggplot command so that the data argument equals this new `dp` dataframe:
 ```r
 dp = filter(endstats,Population=="p1")
@@ -128,7 +128,7 @@ ggplot(dp,aes(x=Generation,y=PopSize,group=Rep,color=Extinct))+
 ```
 
 
-[](../misc/dp-rescue-popsize.png)
+![](../misc/dp-rescue-popsize.png)
 
 We can see that many more of the replicates are avoiding extinction. Finally, after calculating the probabilities table, we can see that this translocation strategy has reduced the extinction probability from 98% down to just 1%:
 ```r
