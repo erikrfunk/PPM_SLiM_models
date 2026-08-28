@@ -1,11 +1,7 @@
 # Summarize a lot of reps
 path="/home/centos/USS/erik/PPM/SLiMrescue/vcf_based_simulations/ExSitu/"
-scenarios = c("FourYearSupplements","TwoYearSupplements","YearlySupplements")
-dirs=c("ReleaseN30","ReleaseN50","ReleaseN80")
 scenarios = c("NoSupplements","FourYearSupplements","TwoYearSupplements","YearlySupplements")
-dirs=c("NoRelease","ReleaseN30","ReleaseN50","ReleaseN80")
-scenarios = c("TwoYearSupplements")
-dirs=c("MaxReleases")
+dirs=c("ReleaseN30","ReleaseN50","ReleaseN80")
 
 repstats=NULL
 for (s in 1:length(scenarios)){
@@ -63,7 +59,7 @@ ggplot(repstats,aes(x=Generation,y=Het_adj,color=Group,group=Group))+
   #geom_point(data=hets,inherit.aes = F, aes(x=Generation,y=Het_obs,size=3),shape=4)+
   #geom_line(stat="smooth",method="loess",aes(group=Rep),alpha=0.35)+
   geom_smooth(span=1,alpha=0.25)+
-  geom_vline(xintercept=28,linetype="dashed",color="gray")+
+  #geom_vline(xintercept=28,linetype="dashed",color="gray")+
   geom_abline(slope=-7.6e-7,intercept=0.001525,linetype="dashed",color="gray")+
   scale_color_manual(values = c("deepskyblue4","darkred","darkgoldenrod3","darkgreen","black"))+
   facet_wrap("Scenario")+

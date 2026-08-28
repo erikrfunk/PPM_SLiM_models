@@ -20,8 +20,37 @@
               "icon": "lucide-file",
               "title": "README"
             }
+          },
+          {
+            "id": "e8b955bc465a9367",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "tutorials/ExSituSupplementation_tutorial.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "ExSituSupplementation_tutorial"
+            }
+          },
+          {
+            "id": "cc8c864f7c8aa12c",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "tutorials/ExtinctionProbability_tutorial.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "ExtinctionProbability_tutorial"
+            }
           }
-        ]
+        ],
+        "currentTab": 1
       }
     ],
     "direction": "vertical"
@@ -161,7 +190,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "README.md",
+                "file": "tutorials/ExSituSupplementation_tutorial.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -185,7 +214,7 @@
       }
     ],
     "direction": "horizontal",
-    "width": 300
+    "width": 363.4090576171875
   },
   "left-ribbon": {
     "hiddenItems": {
@@ -199,12 +228,18 @@
       "obsidian-git:Open Git source control": false
     }
   },
-  "active": "46cb1640f32baa89",
+  "active": "e8b955bc465a9367",
   "lastOpenFiles": [
+    "misc/Pasted image 20260828093914.png",
+    "tutorials/ExSituSupplementation_tutorial.md",
+    "misc/Pasted image 20260828135855.png",
+    "misc/Pasted image 20260828135521.png",
+    "misc/Pasted image 20260828135132.png",
     "tutorials/ExtinctionProbability_tutorial.md",
+    "README.md",
+    "slim-models",
     "misc/no-rescue-popsize.png",
     "misc/dp-rescue-popsize.png",
-    "README.md",
     "misc/DP_rescue_N12Freq4_PopSize.pdf",
     "misc/NoRescue_allPops.pdf",
     "misc",
@@ -213,7 +248,6 @@
     "accessory-scripts/run-form-metapopulation.sh",
     "accessory-scripts/plot-slim-metapop-bots.R",
     "accessory-scripts/plot-slim-1pop-bots.R",
-    "accessory-scripts/plot-ex-situ.R",
-    "accessory-scripts/generate-exsitu-configs.sh"
+    "accessory-scripts/plot-ex-situ.R"
   ]
 }

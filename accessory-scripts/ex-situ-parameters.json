@@ -6,7 +6,7 @@
   "winterMortality": 0.33,
   "release_delay": 9,
   "track_reintro": "F",
-  "trans_size": 30,
+  "trans_size": 0,
   "trans_freq": 2,
   "Z": 72679016,
   "I": 1e3,
@@ -20,7 +20,6 @@
     "SupplementalFounders2016",
     "SupplementalFounders2019",
     "SupplementalFounders2020"],
-  "Supplemental_times": [5, 9, 15, 17,21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61, 65, 69, 73, 77, 81, 85, 89, 93, 97],
+  "Supplemental_times": [5, 9, 15, 17],
   "recycle_supplements": "T"
   }
-
