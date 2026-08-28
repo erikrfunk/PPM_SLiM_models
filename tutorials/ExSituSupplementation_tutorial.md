@@ -122,6 +122,7 @@ Run the code block to iterate through each scenario and each subdirectory, addin
 	<img src="../misc/Pasted image 20260828135132.png" width="500"> 
 </p>
 Again, we have a reference line showing the 10% per 100 generations line. In each panel we have a different supplementation strategy, and each colored line showing a different release size. We can also do this for inbreeding (measured as Froh) by adjusting the y axis variable in the ggplot command:  
+
 ```r
 ggplot(repstats,aes(x=Generation,y=Froh,color=Group,group=Group))+
   geom_smooth(span=1,alpha=0.25)+
@@ -130,6 +131,7 @@ ggplot(repstats,aes(x=Generation,y=Froh,color=Group,group=Group))+
   facet_wrap("Scenario")+
   labs(x="Seasons",y="Inbreeding (Froh)")+
   theme_bw()
+  
 ```
 
 Included in the script are a few lines that are commented out, but have been removed in the above code chunk. Those are additional plotting options that include things like showing all the points. The above block should return something like the following:
