@@ -53,7 +53,9 @@ This could take awhile, so it might be better to break this up in to a handful o
 scenarios = c("NoSupplements")
 dirs=c("")
 ```
-![330](Pasted%20image%2020260828093914.png)
+<p align="center"> 
+	<img src="../misc/Pasted image 20260828093914.png" width="500"> 
+</p>
 
 We can see that heterozygosity declines quite a bit. For reference, the sloping dashed line represents a loss of 10% of starting heterozygosity over 100 years, a common benchmark rate for *ex situ* populations. 
 
@@ -116,7 +118,9 @@ dirs=c("ReleaseN30","ReleaseN50","ReleaseN80")
 
 ```
 Run the code block to iterate through each scenario and each subdirectory, adding them all to common dataframe. The ggplot code is setup to plot heterozygosity and should look something like this:
-![511](../misc/Pasted%20image%2020260828135132.png)
+<p align="center"> 
+	<img src="../misc/Pasted image 20260828135132.png" width="500"> 
+</p>
 Again, we have a reference line showing the 10% per 100 generations line. In each panel we have a different supplementation strategy, and each colored line showing a different release size. We can also do this for inbreeding (measured as Froh) by adjusting the y axis variable in the ggplot command:
 ```r
 ggplot(repstats,aes(x=Generation,y=Froh,color=Group,group=Group))+
@@ -129,6 +133,8 @@ ggplot(repstats,aes(x=Generation,y=Froh,color=Group,group=Group))+
 ```
 Included in the script are a few lines that are commented out, but have been removed in the above code chunk. Those are additional plotting options that include things like showing all the points. The above block should return something like the following:
 
-![526](../misc/Pasted%20image%2020260828135855.png)
+<p align="center"> 
+	<img src="../misc/Pasted image 20260828135855.png" width="500"> 
+</p>
 
 Considering both the heterozygosity plot and the inbreeding plot, we see that there is little difference in the *ex situ* diversity between releasing 30 individuals each year and releasing 50, but there is a noticeable difference when releasing 80, suggesting this is likely too many individuals to release every year given the capacity of the breeding program. Supplementing every year or every other year also result in populations that stay relatively near or above the reference diversity line. 
